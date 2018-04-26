@@ -7,17 +7,21 @@ from sbp.system import *
 from sbp.settings import *
 from sbp.navigation import *
 from sbp.observation import *
-import argparse
 import time
 import csv
+import utm
+
+DEFAULT_PORT = "/dev/ttyUSB0"
+DEFAULT_LOG_FILE = time.strftime("sbp-%Y%m%d-%H%M%S.log")
+
 
 class Window(QtGui.QMainWindow):
 
     def __init__(self):
         super(Window, self).__init__()
 
-        self.home = HomeWidget(self)
-        self.setCentralWidget(self.home)
+        Window.port = DEFAULT_PORT
+        Window.logFile = DEFAULT_LOG_FILE
         
         self.setGeometry(50, 50, 500, 500)
         self.setWindowTitle("RTK GPS Application")
@@ -48,14 +52,15 @@ class Window(QtGui.QMainWindow):
         self.editMenu.addAction(self.aboutAction)
 
         self.commAction = QtGui.QAction(QtGui.QIcon('comport.png'), 'Select Comm Port', self)
-        self.port = self.commAction.triggered.connect(self.comm_settings)
+        self.commAction.triggered.connect(self.comm_settings)
         self.logAction = QtGui.QAction(QtGui.QIcon('file.png'), 'Select Log File Directory', self)
         self.logAction.triggered.connect(self.log_settings)
         
         self.toolBar = self.addToolBar("Comm")
         self.toolBar.addAction(self.commAction)
         self.toolBar.addAction(self.logAction)
-        
+        self.home = HomeWidget(self)
+        self.setCentralWidget(self.home)
         self.show()
         
 
@@ -68,12 +73,20 @@ class Window(QtGui.QMainWindow):
             pass
 
     def comm_settings(self):
-        self.port, ok = QtGui.QInputDialog.getText(self, "Input Port", "Enter Port\nDefault /dev/ttyUSB0")
-        print(self.port)
+        
+        port, ok = QtGui.QInputDialog.getText(self, "Input Port", "Enter Port\nDefault /dev/ttyUSB0")
+        
+        if ok and str(port):
+            Window.port = port
+    
 
     def log_settings(self):
-        logFile = QtGui.QInputDialog.getText(self, "Input File Name", "Enter Log File Name")
-        print(self.port)
+        
+        logFile, ok = QtGui.QInputDialog.getText(self, "Input File Name", "Enter Log File Name")
+
+        if ok and str(port):
+            Window.logFile = logFile
+       
 
     def about_application(self):
         about = QtGui.QMessageBox.about(self, "About", "RTK GPS Application\nVersion 1.0\nChristopher Duff")
@@ -86,10 +99,14 @@ class HomeWidget(QtGui.QWidget):
     def __init__(self, *args):
         QtGui.QWidget.__init__(self, *args)      
         
+        HomeWidget.pause = False
+        
         self.latLabel = QtGui.QLabel("Latitude", self)
         self.longLabel = QtGui.QLabel("Longitude", self)
         self.heightLabel = QtGui.QLabel("Height", self)
         self.fixLabel = QtGui.QLabel("GPS Fix Type", self)
+        self.eastLabel = QtGui.QLabel("Easting", self)
+        self.northLabel = QtGui.QLabel("Northing", self)
 
         self.latEdit = QtGui.QLineEdit(self)
         self.latEdit.setReadOnly(True)
@@ -99,6 +116,10 @@ class HomeWidget(QtGui.QWidget):
         self.heightEdit.setReadOnly(True)
         self.fixEdit = QtGui.QLineEdit(self)
         self.fixEdit.setReadOnly(True)
+        self.eastEdit = QtGui.QLineEdit(self)
+        self.eastEdit.setReadOnly(True)
+        self.northEdit = QtGui.QLineEdit(self)
+        self.northEdit.setReadOnly(True)
 
         self.qBtn = QtGui.QPushButton("Quit", self)
         self.qBtn.clicked.connect(self.close_application)
@@ -107,6 +128,10 @@ class HomeWidget(QtGui.QWidget):
         self.rBtn = QtGui.QPushButton("Run", self)
         self.rBtn.clicked.connect(self.run_application)
         self.rBtn.resize(self.rBtn.minimumSizeHint())
+
+        self.pBtn = QtGui.QPushButton("Pause", self)
+        self.pBtn.clicked.connect(self.pause_application)
+        self.pBtn.resize(self.rBtn.minimumSizeHint())
         
         grid = QtGui.QGridLayout()
         self.setLayout(grid)
@@ -115,12 +140,17 @@ class HomeWidget(QtGui.QWidget):
         grid.addWidget(self.latEdit, 1, 1)
         grid.addWidget(self.longLabel, 2, 0)
         grid.addWidget(self.longEdit, 2, 1)
+        grid.addWidget(self.eastLabel, 1, 2)
+        grid.addWidget(self.eastEdit, 1, 3)
+        grid.addWidget(self.northLabel, 2, 2)
+        grid.addWidget(self.northEdit, 2, 3)
         grid.addWidget(self.heightLabel, 3, 0)
         grid.addWidget(self.heightEdit, 3, 1)
         grid.addWidget(self.fixLabel, 4, 0)
         grid.addWidget(self.fixEdit, 4, 1)
         grid.addWidget(self.qBtn, 5, 0)
         grid.addWidget(self.rBtn, 5, 1)
+        grid.addWidget(self.pBtn,5,2)
 
 
     def close_application(self):
@@ -132,35 +162,25 @@ class HomeWidget(QtGui.QWidget):
         else:
             pass
 
+    def pause_application(self):
+
+        if HomeWidget.pause == False:
+            HomeWidget.pause = True
+            self.pBtn.setText("Unpause")
+
+        else:
+            HomeWidget.pause = False
+            self.pBtn.setText("Pause")
+            
+
     def run_application(self):
-        DEFAULT_LOG_FILENAME=time.strftime("sbp-%Y%m%d-%H%M%S.log")
-        w=Window.__init__
-        attrs = vars(w)
-        print(attrs)
-        parser = argparse.ArgumentParser(
-        description="Swift Navigation SBP Example.")
-        parser.add_argument(
-            "-p",
-            "--port",
-            default=['/dev/ttyUSB0'],
-            nargs=1,
-            help="specify the serial port to use.")
-        parser.add_argument(
-            "-b",
-            "--baud",
-            default=[115200],
-            nargs=1,
-            help="specify the baud rate")
-        parser.add_argument(
-            "-f",
-            "--filename",
-            default=[DEFAULT_LOG_FILENAME],
-            nargs=1,
-            help="specify the name of the log file")
-        args = parser.parse_args()
+        
+        self.port = Window.port
+        self.logFile = Window.logFile
+        self.buad = 115200
 
         # Open a connection to Piksi using the default baud rate (115200) and port (/dev/ttyUSB0
-        driver = PySerialDriver(args.port[0], args.baud[0])
+        driver = PySerialDriver(self.port, self.buad)
         source = Handler(Framer(driver.read, None, verbose=True))
                          
         # Use SBP built in callback function to create callback for posLLH messages
@@ -171,11 +191,35 @@ class HomeWidget(QtGui.QWidget):
 
     def posLLH(self, msg, **metadata):
 
-        #update the feilds everytime a posLLH message is recieved
-        self.latEdit.setText(str(msg.lat))
-        self.longEdit.setText(str(msg.lon)) 
-        self.heightEdit.setText(str(msg.height))
-        self.fixEdit.setText(str(msg.flags))
+        if HomeWidget.pause == False:
+
+            #update the feilds everytime a posLLH message is recieved
+            self.latEdit.setText(str(msg.lat))
+            self.longEdit.setText(str(msg.lon)) 
+            self.heightEdit.setText(str(msg.height))
+        
+            if msg.flags == 1:
+                self.fixEdit.setText("Single Point Position")
+                
+            elif msg.flags == 2:
+                self.fixEdit.setText("Differential GNSS")
+
+            elif msg.flags == 3:
+                self.fixEdit.setText("Float RTK")
+
+            elif msg.flags == 4:
+                self.fixEdit.setText("Fixed RTK")
+
+            else:
+                self.fixEdit.setText("Invalid")
+
+            conv = utm.from_latlon(msg.lat, msg.lon)
+            self.eastEdit.setText(str(conv[0])) 
+            self.northEdit.setText(str(conv[1]))
+
+        else:
+            pass
+        
 
 def main():
     app = QtGui.QApplication(sys.argv)
