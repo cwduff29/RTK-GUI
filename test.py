@@ -1,3 +1,4 @@
+
 # Copyright (C) 2015 Swift Navigation Inc.
 # Contact: Fergus Noble <fergus@swiftnav.com>
 #
@@ -16,7 +17,8 @@ printing them out.
 from sbp.client.drivers.pyserial_driver import PySerialDriver
 from sbp.client import Handler, Framer
 from sbp.client.loggers.json_logger import JSONLogger
-from sbp.system import SBP_MSG_STARTUP, MsgStartup
+from sbp.system import *
+from sbp.settings import *
 from sbp.navigation import *
 from sbp.observation import *
 import argparse
@@ -47,19 +49,42 @@ def main():
 	nargs=1,
 	help="specify the name of the log file")
     args = parser.parse_args()
+    print args 
 
     # Open a connection to Piksi using the default baud rate (1Mbaud)
+   # driver =  PySerialDriver(args.port[0], args.baud[0])
+   # source =  Handler(Framer(driver.read, None, verbose=True))
+
+   # source.add_callback(posLLHCallback, SBP_MSG_POS_LLH)
+   # source.add_callback(baselineCallback, SBP_MSG_BASE_POS_LLH)
+   # source.start()
+   # print SBP_MSG_BASE_POS_LLH
+
+   # Open a connection to Piksi using the default baud rate (1Mbaud)
     with PySerialDriver(args.port[0], args.baud[0]) as driver:
         with Handler(Framer(driver.read, None, verbose=True)) as source:
-          try:
-	        for msg, metadata in source.filter(SBP_MSG_POS_LLH):
-              # Print out the N, E, D coordinates of the baseline
-                  print "%.4f,%.4f,%.4f" % (msg.lat, msg.lon, msg.height)
-		  # data = msg.lat
-		  # print data
-          except KeyboardInterrupt:
-             pass
+            try:
+                for msg, metadata in source.filter(SBP_MSG_BASELINE_NED):
+                    # Print out the N, E, D coordinates of the baseline
+                    print msg 
+                    
+            except KeyboardInterrupt:
+                pass
+   
+    try:
+        while(1):
+            time.sleep(.01)
+    except KeyboardInterrupt:
+        pass
 
+
+def posLLHCallback(msg, **metadata):
+    print "MSG POS LLH found\n"
+   # print "%.4f,%.4f,%.4f" % (msg.lat, msg.lon, msg.height)
+
+def baselineCallback(msg, **metadata):
+    print "MSG Baseline NED Found\n"
+    print msg
 
 if __name__ == "__main__":
     main()
