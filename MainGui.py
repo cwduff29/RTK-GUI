@@ -1,3 +1,4 @@
+# nothing important
 import sys
 from PyQt4 import QtGui, QtCore
 from sbp.client.drivers.pyserial_driver import PySerialDriver
